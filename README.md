@@ -9,6 +9,7 @@ This is a **local evaluation environment**, not an RL training run. It is intent
 | Path | Purpose |
 | --- | --- |
 | `range_repair/taskset.py` | Buggy source, public and held-out tests, task setup, and reward |
+| `environments/range_repair_agent/` | Standalone v1 package for the Prime Environments Hub |
 | `configs/local-eval.toml` | Docker runtime, agent limits, and evaluation settings |
 | `.env.example` | Template for local model settings; the filled `.env` stays untracked |
 | `scripts/local.sh` | Loads `.env` and runs the model check, validation, or evaluation |
@@ -91,6 +92,27 @@ prime env install <taskset-id>
 Replace `<taskset-id>` with the actual ID shown by Prime. Some Hub tasks need a different harness, Docker image, extra packages, or credentials; check that task's README and override its settings in the evaluation config. The local model server must support the API and tool calls required by the selected harness. `prime login` is for Hub access; the model still runs on the endpoint in your `.env`.
 
 The built-in `bash` harness is the coding agent used and tested here. To try the separate **Prime Agent** harness with this task, use `--env.agent.harness.id prime-agent` on the dry run and evaluation commands. That harness installs its own agent program and has not yet been verified against this local model; its tool and API requirements may differ.
+
+## Publish this environment to Prime's Hub
+
+The standalone package is in `environments/range_repair_agent/`. It includes the task, held-out scorer, and an isolated verifier environment. Its source is a copy of `range_repair/taskset.py`, so update both files when changing the task.
+
+Validate the package and test it with the local model before publishing:
+
+```bash
+PYTHONPATH=environments/range_repair_agent uv run vf-validate range-repair-agent --runtime.type docker --no-rich
+PYTHONPATH=environments/range_repair_agent ./scripts/local.sh eval --env.id range-repair-agent --env.taskset.id range-repair-agent
+uv build environments/range_repair_agent
+```
+
+This package is published as [`akashdeepjassal/range-repair-agent@0.1.0`](https://app.primeintellect.ai/dashboard/environments/akashdeepjassal/range-repair-agent). To publish an updated version, bump the version in its `pyproject.toml`, sign in to Prime, and push the package directory, explicitly selecting Verifiers v1:
+
+```bash
+prime login
+prime env push --path environments/range_repair_agent --runtime v1 --visibility PUBLIC
+```
+
+Prime requires a username on your profile before a push. Use `prime env install akashdeepjassal/range-repair-agent@0.1.0` to install the published version. Keep `.env`, raw `outputs/`, build artifacts, and Prime's local metadata out of Git. This is a one-task evaluation example; publishing it does not train the model.
 
 ## Task and scoring details
 

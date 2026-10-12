@@ -1,0 +1,23 @@
+[project]
+name = "range-repair-agent"
+description = "A coding agent repairs a range-merging bug and is scored in an isolated container"
+tags = ["coding", "agents", "eval"]
+version = "0.1.0"
+requires-python = ">=3.11,<3.15"
+dependencies = [
+    "verifiers @ git+https://github.com/PrimeIntellect-ai/verifiers.git@e2253343056e2ed7507e67af48ebddfa4e3a7b96",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[tool.hatch.build]
+include = ["range_repair_agent.py", "pyproject.toml", "README.md"]
+
+[tool.verifiers.eval]
+num_examples = 1
+rollouts_per_example = 1
