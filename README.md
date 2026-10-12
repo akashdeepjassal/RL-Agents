@@ -116,7 +116,9 @@ Prime requires a username on your profile before a push. Use `prime env install 
 
 ## Submit a local-model evaluation to Prime
 
-The Hub environment and an evaluation are separate records. `prime env push` publishes the task code. The local commands earlier in this README use `push = false` in `configs/local-eval.toml`, so they write traces under `outputs/` but create **no** entry on Prime's Evaluations dashboard. The successful run in `results/2026-10-13-range-repair-agent.md` was local and was not submitted to Prime.
+The Hub environment and an evaluation are separate records. `prime env push` publishes the task code. The local commands earlier in this README use `push = false` in `configs/local-eval.toml`, so they write traces under `outputs/` but create **no** entry on Prime's Evaluations dashboard. The package validation and local run in `results/2026-10-13-range-repair-agent.md` preceded the later Prime submissions.
+
+The [public leaderboard evaluation](https://app.primeintellect.ai/dashboard/evaluations/ge1divvv3grrjdn1y4tbx1qr) completed with a score of `1.0` on one task. Prime reports `is_public: true` and `show_on_leaderboard: true`. The concise result and its limits are recorded in [`results/2026-10-13-public-prime-evaluation.md`](results/2026-10-13-public-prime-evaluation.md).
 
 **Keep the model address private before uploading a trace.** The local trace includes the client's base URL. The existing local traces were created with a literal LAN address and must stay local. To submit a new evaluation without putting that address in Prime's trace, use a local hostname that resolves to your model server. If your model machine has no hostname, add a private mapping in this computer's `/etc/hosts` (on macOS, `sudo nano /etc/hosts`):
 
@@ -162,7 +164,9 @@ PYTHONPATH=environments/range_repair_agent ./scripts/local.sh eval --env.id rang
 prime eval list --output json --plain
 ```
 
-The evaluation output should include a Prime dashboard URL ending in `/dashboard/evaluations/<evaluation-id>`. Confirm the new record appears in `prime eval list`; an evaluation can finish locally even if its upload fails. Use `prime eval get <evaluation-id>` and `prime eval samples <evaluation-id>` to inspect the submitted status and score. The Evaluations page is at [Prime Evaluations](https://app.primeintellect.ai/dashboard/evaluations).
+The evaluation output should include a Prime dashboard URL ending in `/dashboard/evaluations/<evaluation-id>`. Confirm the new record appears in `prime eval list`; an evaluation can finish locally even if its upload fails. Use `prime eval get <evaluation-id>` and `prime eval samples <evaluation-id>` to inspect the submitted status and score. The Evaluations page is at [Prime Evaluations](https://app.primeintellect.ai/dashboard/evaluations). **`vf-eval --push` creates a private evaluation; it does not submit to the environment leaderboard.**
+
+For a public evaluation, the installed Prime CLI accepts `prime eval push <evaluation-data-directory> --env akashdeepjassal/range-repair-agent --public`. That directory must contain `metadata.json` and `results.jsonl`. The current `vf-eval` output contains `traces.jsonl`, so it must be converted and checked for private data before using `prime eval push`. The public submission above was created from a checked, one-sample summary of the completed local trace. `--public` creates a new evaluation; it cannot be combined with `--eval-id` to change an existing private evaluation. After pushing, check both `is_public` and `show_on_leaderboard` with `prime eval get <new-evaluation-id>`.
 
 Do not use `prime eval push` on this repository's v1 `outputs/` directories: that separate command expects `metadata.json` and `results.jsonl`, while this project writes `traces.jsonl`. To run a hosted evaluation instead, use `prime eval run ... --hosted` with a model reachable from Prime's runner. A model available only on your LAN will not be reachable from that runner. Hosted evaluations may require billing; the local `--push` path uses your own model server.
 
