@@ -114,6 +114,58 @@ prime env push --path environments/range_repair_agent --runtime v1 --visibility 
 
 Prime requires a username on your profile before a push. Use `prime env install akashdeepjassal/range-repair-agent@0.1.0` to install the published version. Keep `.env`, raw `outputs/`, build artifacts, and Prime's local metadata out of Git. This is a one-task evaluation example; publishing it does not train the model.
 
+## Submit a local-model evaluation to Prime
+
+The Hub environment and an evaluation are separate records. `prime env push` publishes the task code. The local commands earlier in this README use `push = false` in `configs/local-eval.toml`, so they write traces under `outputs/` but create **no** entry on Prime's Evaluations dashboard. The successful run in `results/2026-10-13-range-repair-agent.md` was local and was not submitted to Prime.
+
+**Keep the model address private before uploading a trace.** The local trace includes the client's base URL. The existing local traces were created with a literal LAN address and must stay local. To submit a new evaluation without putting that address in Prime's trace, use a local hostname that resolves to your model server. If your model machine has no hostname, add a private mapping in this computer's `/etc/hosts` (on macOS, `sudo nano /etc/hosts`):
+
+```text
+<your-model-server-LAN-address> rl-model.test
+```
+
+Then edit only the ignored `.env`, retaining your current port and model ID. For a server using port 8000, the base URL would be:
+
+```text
+LOCAL_MODEL_BASE_URL=http://rl-model.test:8000/v1
+```
+
+Do not put the address, key, or filled `.env` in Git, commands pasted into public issues, or result reports. Confirm the hostname resolves and the model is reachable:
+
+```bash
+./scripts/local.sh models
+prime whoami
+```
+
+If `prime whoami` fails, run `prime login` first. Next, make one **unsubmitted** trial run with the hostname and inspect its newest trace:
+
+```bash
+PYTHONPATH=environments/range_repair_agent ./scripts/local.sh eval --env.id range-repair-agent --env.taskset.id range-repair-agent
+
+python3 - <<'PY'
+from pathlib import Path
+import re
+
+traces = list(Path('outputs').glob('range-repair-agent+range-repair-agent--*/traces.jsonl'))
+latest = max(traces, key=lambda path: path.stat().st_mtime)
+data = latest.read_bytes()
+assert not re.search(rb'(?<![0-9])(?:[0-9]{1,3}\.){3}[0-9]{1,3}(?![0-9])', data), 'Trace contains an IP address'
+assert not re.search(rb'(?i)(?:sk-[A-Za-z0-9_-]{12,}|ghp_[A-Za-z0-9]{12,}|github_pat_[A-Za-z0-9_]{12,})', data), 'Trace contains a credential-like token'
+print('Newest trace passed the basic privacy check:', latest)
+PY
+```
+
+Review the trace for any other private data before submitting. Now run a **new** evaluation with `--push`; this overrides the repository's `push = false` setting and uploads the run to your private Prime Evaluations tab:
+
+```bash
+PYTHONPATH=environments/range_repair_agent ./scripts/local.sh eval --env.id range-repair-agent --env.taskset.id range-repair-agent --push
+prime eval list --output json --plain
+```
+
+The evaluation output should include a Prime dashboard URL ending in `/dashboard/evaluations/<evaluation-id>`. Confirm the new record appears in `prime eval list`; an evaluation can finish locally even if its upload fails. Use `prime eval get <evaluation-id>` and `prime eval samples <evaluation-id>` to inspect the submitted status and score. The Evaluations page is at [Prime Evaluations](https://app.primeintellect.ai/dashboard/evaluations).
+
+Do not use `prime eval push` on this repository's v1 `outputs/` directories: that separate command expects `metadata.json` and `results.jsonl`, while this project writes `traces.jsonl`. To run a hosted evaluation instead, use `prime eval run ... --hosted` with a model reachable from Prime's runner. A model available only on your LAN will not be reachable from that runner. Hosted evaluations may require billing; the local `--push` path uses your own model server.
+
 ## Task and scoring details
 
 - **Issue:** `merge_ranges` incorrectly separates ranges that share an endpoint. For example, `(1, 2)` and `(2, 5)` should become `(1, 5)`.
