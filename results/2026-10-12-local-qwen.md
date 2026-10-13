@@ -24,11 +24,11 @@ The agent inspected the file, used the edit tool, ran the four public tests, and
 
 ## Reproduce
 
-After following the [setup instructions](../README.md#setup-from-a-fresh-checkout), run:
+After following the [branch-specific setup instructions](../README.md#setup-from-a-fresh-checkout), run:
 
 ```bash
 ./scripts/local.sh validate
 ./scripts/local.sh eval
 ```
 
-The completed local run was written to `outputs/isolated-verifier+range-repair--sparky--qwen3.8-flash-next--bash--3d179357/`. Its episode ID was `f5a6f84345584e2885e11e754abcafa7`, and the scorer recorded `held_out_tests: 1.0`. Raw traces stay local under `outputs/` and are excluded from Git; inspect them before publishing because they contain model messages and local configuration details.
+The completed local run was written to `outputs/isolated-verifier+range-repair--sparky--qwen3.8-flash-next--bash--3d179357/`. Its episode ID was `f5a6f84345584e2885e11e754abcafa7`, and the scorer recorded `held_out_tests: 1.0`. Raw traces stay local under `outputs/` and are excluded from Git; inspect them before publishing because they contain model messages and local configuration details. The later [public Prime result](2026-10-13-public-prime-evaluation.md) is a separate submission, not another independent task.

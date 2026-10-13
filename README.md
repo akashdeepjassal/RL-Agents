@@ -13,6 +13,7 @@ This is a **local evaluation environment**, not an RL training run. It is intent
 | `configs/local-eval.toml` | Docker runtime, agent limits, and evaluation settings |
 | `.env.example` | Template for local model settings; the filled `.env` stays untracked |
 | `scripts/local.sh` | Loads `.env` and runs the model check, validation, or evaluation |
+| `scripts/prepare_prime_upload.py` | Exports score-only files for a public Prime submission |
 | `pyproject.toml` and `uv.lock` | Python project and pinned dependencies |
 | `results/` | Short, publishable summaries of completed evaluations |
 
@@ -32,6 +33,7 @@ No Prime account or login is required for the local commands below. `push = fals
 ```bash
 git clone https://github.com/akashdeepjassal/RL-Agents.git
 cd RL-Agents
+git switch --track origin/prime-local-agent
 
 # On macOS, start Docker Desktop if it is not already running:
 open -a Docker
@@ -82,7 +84,7 @@ The pinned Verifiers version currently prints a deprecation notice for `vf-eval`
 This repository's `range-repair` task is local. To evaluate a public Hub task with the same local model, install the [Prime CLI](https://github.com/PrimeIntellect-ai/prime), find a taskset ID in the [Environments Hub](https://app.primeintellect.ai/dashboard/environments), and install it into the Verifiers environment:
 
 ```bash
-uv tool install prime
+uv tool install 'prime==0.12.0'
 prime login
 prime env install <taskset-id>
 ./scripts/local.sh dry-run --env.taskset.id <taskset-id>
@@ -116,59 +118,71 @@ Prime requires a username on your profile before a push. Use `prime env install 
 
 ## Submit a local-model evaluation to Prime
 
-The Hub environment and an evaluation are separate records. `prime env push` publishes the task code. The local commands earlier in this README use `push = false` in `configs/local-eval.toml`, so they write traces under `outputs/` but create **no** entry on Prime's Evaluations dashboard. The package validation and local run in `results/2026-10-13-range-repair-agent.md` preceded the later Prime submissions.
+The published [environment](https://app.primeintellect.ai/dashboard/environments/akashdeepjassal/range-repair-agent) and each evaluation are separate records. Local runs use `push = false` and create no Prime evaluation. The public [one-attempt result](https://app.primeintellect.ai/dashboard/evaluations/ge1divvv3grrjdn1y4tbx1qr) scored `1.0`; it is a smoke test, not a reliability estimate or RL training.
 
-The [public leaderboard evaluation](https://app.primeintellect.ai/dashboard/evaluations/ge1divvv3grrjdn1y4tbx1qr) completed with a score of `1.0` on one task. Prime reports `is_public: true` and `show_on_leaderboard: true`. The concise result and its limits are recorded in [`results/2026-10-13-public-prime-evaluation.md`](results/2026-10-13-public-prime-evaluation.md).
+### 1. Set up and validate
 
-**Keep the model address private before uploading a trace.** The local trace includes the client's base URL. The existing local traces were created with a literal LAN address and must stay local. To submit a new evaluation without putting that address in Prime's trace, use a local hostname that resolves to your model server. If your model machine has no hostname, add a private mapping in this computer's `/etc/hosts` (on macOS, `sudo nano /etc/hosts`):
-
-```text
-<your-model-server-LAN-address> rl-model.test
-```
-
-Then edit only the ignored `.env`, retaining your current port and model ID. For a server using port 8000, the base URL would be:
-
-```text
-LOCAL_MODEL_BASE_URL=http://rl-model.test:8000/v1
-```
-
-Do not put the address, key, or filled `.env` in Git, commands pasted into public issues, or result reports. Confirm the hostname resolves and the model is reachable:
+Follow [fresh-checkout setup](#setup-from-a-fresh-checkout), start Docker, and configure the ignored `.env`. For a **private trace upload**, use a hostname for the model server in `LOCAL_MODEL_BASE_URL` so the trace does not contain a literal private address. If needed, map a hostname to the server in your machine's private hosts file. Do not publish that mapping, your key, or your filled `.env`.
 
 ```bash
 ./scripts/local.sh models
-prime whoami
-```
-
-If `prime whoami` fails, run `prime login` first. Next, make one **unsubmitted** trial run with the hostname and inspect its newest trace:
-
-```bash
+./scripts/local.sh validate
+PYTHONPATH=environments/range_repair_agent uv run vf-validate range-repair-agent --runtime.type docker --no-rich
+PYTHONPATH=environments/range_repair_agent ./scripts/local.sh dry-run --env.id range-repair-agent --env.taskset.id range-repair-agent
 PYTHONPATH=environments/range_repair_agent ./scripts/local.sh eval --env.id range-repair-agent --env.taskset.id range-repair-agent
-
-python3 - <<'PY'
-from pathlib import Path
-import re
-
-traces = list(Path('outputs').glob('range-repair-agent+range-repair-agent--*/traces.jsonl'))
-latest = max(traces, key=lambda path: path.stat().st_mtime)
-data = latest.read_bytes()
-assert not re.search(rb'(?<![0-9])(?:[0-9]{1,3}\.){3}[0-9]{1,3}(?![0-9])', data), 'Trace contains an IP address'
-assert not re.search(rb'(?i)(?:sk-[A-Za-z0-9_-]{12,}|ghp_[A-Za-z0-9]{12,}|github_pat_[A-Za-z0-9_]{12,})', data), 'Trace contains a credential-like token'
-print('Newest trace passed the basic privacy check:', latest)
-PY
 ```
 
-Review the trace for any other private data before submitting. Now run a **new** evaluation with `--push`; this overrides the repository's `push = false` setting and uploads the run to your private Prime Evaluations tab:
+The last command makes an unsubmitted local attempt. Check the reward and inspect its `traces.jsonl` under `outputs/`. Select its exact path; do not assume the newest directory belongs to the intended run. Raw traces and resolved configurations can contain endpoint details or model messages and must remain private.
+
+### 2. Upload a new private evaluation
+
+Install and sign in to the Prime CLI. These commands were checked against Prime CLI `0.12.0` and the pinned Verifiers `vf-eval`.
 
 ```bash
+uv tool install 'prime==0.12.0'
+prime whoami
+# If not signed in: prime login
 PYTHONPATH=environments/range_repair_agent ./scripts/local.sh eval --env.id range-repair-agent --env.taskset.id range-repair-agent --push
 prime eval list --output json --plain
 ```
 
-The evaluation output should include a Prime dashboard URL ending in `/dashboard/evaluations/<evaluation-id>`. Confirm the new record appears in `prime eval list`; an evaluation can finish locally even if its upload fails. Use `prime eval get <evaluation-id>` and `prime eval samples <evaluation-id>` to inspect the submitted status and score. The Evaluations page is at [Prime Evaluations](https://app.primeintellect.ai/dashboard/evaluations). **`vf-eval --push` creates a private evaluation; it does not submit to the environment leaderboard.**
+`--push` makes a **new** run and uploads its full trace privately. Review privacy before running it; the preceding local trial is the chance to inspect what a trace contains. Note the evaluation ID printed by the upload, then use `prime eval get <evaluation-id> --output json --plain` and `prime eval samples <evaluation-id> --output json --plain` to confirm completion and score. A successful local run alone does not prove upload succeeded. The earlier private evaluation ID was `fuigrgq5ak71gspj84xabuec`; it is separate from the public result.
 
-For a public evaluation, the installed Prime CLI accepts `prime eval push <evaluation-data-directory> --env akashdeepjassal/range-repair-agent --public`. That directory must contain `metadata.json` and `results.jsonl`. The current `vf-eval` output contains `traces.jsonl`, so it must be converted and checked for private data before using `prime eval push`. The public submission above was created from a checked, one-sample summary of the completed local trace. `--public` creates a new evaluation; it cannot be combined with `--eval-id` to change an existing private evaluation. After pushing, check both `is_public` and `show_on_leaderboard` with `prime eval get <new-evaluation-id>`.
+### 3. Submit a score-only public evaluation
 
-Do not use `prime eval push` on this repository's v1 `outputs/` directories: that separate command expects `metadata.json` and `results.jsonl`, while this project writes `traces.jsonl`. To run a hosted evaluation instead, use `prime eval run ... --hosted` with a model reachable from Prime's runner. A model available only on your LAN will not be reachable from that runner. Hosted evaluations may require billing; the local `--push` path uses your own model server.
+Prime CLI `prime eval push` needs `metadata.json` and `results.jsonl`; the pinned local `vf-eval` writes `traces.jsonl` instead. Convert **one explicitly chosen** completed local trace into a score-only summary. The exporter includes task IDs, trace IDs, rewards, the model ID, and aggregate scores; it excludes prompts, completions, keys, and endpoint URLs. Use the model ID from your ignored `.env`, not its base URL. The destination must be a new directory under ignored `outputs/`.
+
+```bash
+python3 scripts/prepare_prime_upload.py \
+  outputs/<chosen-local-run>/traces.jsonl \
+  outputs/prime-upload-example \
+  --model '<model-id>'
+cat outputs/prime-upload-example/metadata.json
+cat outputs/prime-upload-example/results.jsonl
+```
+
+Replace the placeholders with the selected paths and model ID. Check that the sample count and scores match that trace. Review both generated files for any private values before uploading. For example, this basic scan catches IPv4 addresses and common credential shapes; manually check hostnames and other secrets too:
+
+```bash
+rg -n -i '(?:[0-9]{1,3}\.){3}[0-9]{1,3}|sk-[A-Za-z0-9_-]{12,}|ghp_[A-Za-z0-9]{12,}|github_pat_[A-Za-z0-9_]{12,}' outputs/prime-upload-example
+```
+
+No matches is the expected result. Submit only after review:
+
+```bash
+prime eval push outputs/prime-upload-example --env akashdeepjassal/range-repair-agent --public
+prime eval get <new-evaluation-id> --output json --plain
+prime eval samples <new-evaluation-id> --output json --plain
+```
+
+`--public` creates a new evaluation; it cannot be combined with `--eval-id` to change the private evaluation. Inspect the returned record for `status: COMPLETED`, `metrics.score`, `is_public: true`, and `show_on_leaderboard: true`. Confirm the sample count and per-sample reward with `prime eval samples`. Public visibility alone does **not** guarantee leaderboard inclusion; `show_on_leaderboard` is a separate reported field. The published one-attempt result can be checked with:
+
+```bash
+prime eval get ge1divvv3grrjdn1y4tbx1qr --output json --plain
+prime eval samples ge1divvv3grrjdn1y4tbx1qr --output json --plain
+```
+
+The recorded values are `COMPLETED`, `metrics.score = 1.0`, `is_public = true`, `show_on_leaderboard = true`, and one sample. See the [public result report](results/2026-10-13-public-prime-evaluation.md). Do not pass a raw v1 `outputs/` run to `prime eval push`: it lacks the required files. Hosted `prime eval run` requires a model reachable from Prime's runner; a LAN-only endpoint is not reachable there.
 
 ## Task and scoring details
 

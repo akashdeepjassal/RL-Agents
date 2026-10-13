@@ -21,3 +21,5 @@ uv build environments/range_repair_agent
 The generated wheel was also installed in a separate temporary environment, where both the taskset and environment classes loaded. Raw traces, logs, and resolved configurations remain under ignored `outputs/`; they can contain private connection details and are not part of this report. This is one successful local evaluation, not an RL training run or a reliability estimate.
 
 The package was pushed to the Prime Hub as a public Verifiers v1 environment. The Hub reports version `0.1.0`, and its archive contains only `README.md`, `pyproject.toml`, and `range_repair_agent.py`.
+
+These checks validated the package and one local attempt. The later [public Prime evaluation](2026-10-13-public-prime-evaluation.md) is documented separately; publishing the package did not train a model or establish a success rate.
