@@ -1,0 +1,29 @@
+# The model and endpoint are supplied by scripts/local.sh from the ignored .env.
+num_rollouts = 1
+max_concurrent = 1
+push = false
+output_dir = "outputs"
+
+[client]
+type = "eval"
+api_key_var = "LOCAL_MODEL_KEY"
+
+[sampling]
+temperature = 0.0
+max_tokens = 2048
+
+[env]
+id = "isolated-verifier"
+
+[env.taskset]
+id = "range-repair"
+
+[env.agent]
+max_turns = 12
+
+[env.agent.runtime]
+type = "docker"
+image = "docker.io/library/python:3.11-slim"
+
+[env.agent.harness]
+id = "bash"

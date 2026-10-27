@@ -11,6 +11,7 @@ __pycache__/
 build/
 develop-eggs/
 dist/
+.prime/
 downloads/
 eggs/
 .eggs/
@@ -151,8 +152,11 @@ activemq-data/
 
 # Environments
 .env
+.env.*
+!.env.example
 .envrc
 .venv
+outputs/
 env/
 venv/
 ENV/
